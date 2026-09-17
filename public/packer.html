@@ -33,32 +33,188 @@
 <body>
   <main class="wrap">
     <header>
-      <div><div class="tiny">GROWTOPIA ASSET UTILITY</div><h1>Bungkus banyak aset menjadi satu DAT.</h1><p class="lead">Buka paket contoh untuk mempertahankan metadata, ganti atau tambahkan XML dan RTTEX, lalu ekspor kembali. Semua proses berlangsung di perangkatmu.</p></div>
+      <div>
+        <div class="tiny">GROWTOPIA ASSET UTILITY</div>
+        <h1>Gabungkan banyak item menjadi satu DAT.</h1>
+        <p class="lead">Pilih Nahida.dat, Lesley.dat, Moskov.dat, dan paket lain sekaligus. Item, metadata, XML, serta RTTEX akan digabung tanpa diunggah ke server kami.</p>
+      </div>
       <div class="badge">● Lokal & privat</div>
     </header>
+
     <section class="grid">
-      <article class="card"><div class="step"><div class="num">1</div><h2>Buka template DAT</h2></div><p class="hint">Disarankan: gunakan paket yang sudah diterima hosting agar metadata dan ID tetap terbawa.</p><div class="drop"><input id="templateInput" type="file" accept=".dat,application/octet-stream" /><div><strong>Pilih paket .dat</strong><span class="hint">Contoh: cwater sword.dat</span></div></div></article>
-      <article class="card"><div class="step"><div class="num">2</div><h2>Tambahkan aset</h2></div><p class="hint">Pilih beberapa RTTEX dan XML sekaligus. Path serta grup masih dapat diubah.</p><div class="drop"><input id="assetInput" type="file" multiple accept=".rttex,.xml,text/xml,application/octet-stream" /><div><strong>Pilih XML + RTTEX</strong><span class="hint">Multi-file didukung</span></div></div></article>
+      <article class="card">
+        <div class="step"><div class="num">1</div><h2>Gabungkan paket DAT</h2></div>
+        <p class="hint">Pilih satu atau banyak paket item. Semua metadata, ID, XML, dan RTTEX akan disatukan.</p>
+        <div class="drop">
+          <input id="templateInput" type="file" multiple accept=".dat,application/octet-stream" />
+          <div><strong>Pilih banyak file .dat</strong><span class="hint">Contoh: Nahida.dat + Lesley.dat</span></div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="step"><div class="num">2</div><h2>Tambahkan aset</h2></div>
+        <p class="hint">Pilih beberapa RTTEX dan XML sekaligus. Path serta grup masih dapat diubah.</p>
+        <div class="drop">
+          <input id="assetInput" type="file" multiple accept=".rttex,.xml,text/xml,application/octet-stream" />
+          <div><strong>Pilih XML + RTTEX</strong><span class="hint">Multi-file didukung</span></div>
+        </div>
+      </article>
     </section>
-    <div class="toolbar"><button class="btn" id="blankBtn">Paket baru</button><button class="btn" id="autoBtn">Rapikan path otomatis</button><span id="summary" class="status">Belum ada file</span></div>
+
+    <div class="toolbar">
+      <button class="btn" id="blankBtn">Paket baru</button>
+      <button class="btn" id="autoBtn">Rapikan path otomatis</button>
+      <span id="summary" class="status">Belum ada file</span>
+    </div>
+
     <section id="files" class="files"><div class="empty">Buka template atau tambahkan aset untuk mulai.</div></section>
-    <details class="advanced card"><summary>Metadata lanjutan</summary><p class="hint">Saat template dibuka, JSON dan ID akan dipertahankan. Ubah hanya jika kamu memahami format item hosting.</p><div class="advanced-grid"><label><span>ID item utama</span><input id="primaryId" type="text" inputmode="numeric" value="0" /></label><label><span>ID item efek</span><input id="effectId" type="text" inputmode="numeric" value="0" /></label></div><label><span>Array metadata JSON</span><textarea id="metadata">[]</textarea></label><div class="notice">Paket kosong tanpa metadata cocok untuk uji struktur. Untuk upload item, mulai dari template DAT yang sudah berhasil digunakan di hosting.</div></details>
-    <div class="footerbar"><div id="log">Siap memproses file.</div><button class="btn primary" id="exportBtn">Ekspor paket .dat</button></div>
+
+    <details class="advanced card">
+      <summary>Metadata lanjutan</summary>
+      <p class="hint">Saat beberapa DAT dibuka, seluruh JSON dan ID item akan digabung. Ubah hanya jika kamu memahami format hosting.</p>
+      <label><span>Daftar ID item (pisahkan dengan koma)</span><input id="itemIds" type="text" inputmode="numeric" value="" placeholder="25000, 25003, 25005" /></label>
+      <label><span>Array metadata JSON</span><textarea id="metadata">[]</textarea></label>
+      <div class="notice">Untuk membuat beberapa item sekaligus, gabungkan paket DAT lengkap. Menambahkan RTTEX/XML saja hanya menambah resource, bukan metadata item.</div>
+    </details>
+
+    <div class="footerbar">
+      <div id="log">Siap memproses file.</div>
+      <button class="btn primary" id="exportBtn">Ekspor paket .dat</button>
+    </div>
   </main>
+
   <script>
-    const enc=new TextEncoder(),dec=new TextDecoder();let entries=[],sourceName="custom-assets.dat",formatVersion=1;const $=id=>document.getElementById(id);
-    const u16=n=>{const b=new Uint8Array(2);new DataView(b.buffer).setUint16(0,n,true);return b},u32=n=>{const b=new Uint8Array(4);new DataView(b.buffer).setUint32(0,n,true);return b},u64=n=>{const b=new Uint8Array(8);new DataView(b.buffer).setBigUint64(0,BigInt(n||0),true);return b};
-    function join(parts){const total=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(total);let o=0;for(const p of parts){out.set(p,o);o+=p.length}return out}
-    async function streamCodec(data,type){const stream=type==="compress"?new CompressionStream("deflate"):new DecompressionStream("deflate");return new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(stream)).arrayBuffer())}
-    const safeBig=v=>{try{return BigInt(String(v||"0").trim())}catch{return 0n}};
-    function guess(file){const n=file.name.toLowerCase();if(n.endsWith(".xml"))return{path:file.name,group:3};if(n.includes("_ic."))return{path:file.name,group:1};if(n.includes("particle")||n.includes("punch")||n.includes("slash"))return{path:"game/"+file.name,group:4};return{path:"game/"+file.name,group:2}}
-    function fmt(n){return n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(2)+" MB"}function setLog(text,kind=""){$("log").textContent=text;$("log").className=kind}
-    function render(){const root=$("files");root.innerHTML="";if(!entries.length)root.innerHTML='<div class="empty">Buka template atau tambahkan aset untuk mulai.</div>';entries.forEach((e,i)=>{const row=document.createElement("div");row.className="file";row.innerHTML=`<div class="file-name"><strong></strong><small>${fmt(e.data.length)}</small></div><input aria-label="Path arsip" type="text"><input aria-label="Grup file" type="number" min="0" max="255"><button class="btn icon danger" aria-label="Hapus file">×</button>`;row.querySelector("strong").textContent=e.originalName||e.path;const inputs=row.querySelectorAll("input");inputs[0].value=e.path;inputs[1].value=e.group;inputs[0].oninput=ev=>entries[i].path=ev.target.value;inputs[1].oninput=ev=>entries[i].group=Math.max(0,Math.min(255,Number(ev.target.value)||0));row.querySelector("button").onclick=()=>{entries.splice(i,1);render()};root.appendChild(row)});$("summary").textContent=entries.length?`${entries.length} file • ${fmt(entries.reduce((s,e)=>s+e.data.length,0))}`:"Belum ada file"}
-    async function parseDat(file){const raw=new Uint8Array(await file.arrayBuffer());if(raw.length<9)throw new Error("File DAT terlalu kecil.");const dv=new DataView(raw.buffer,raw.byteOffset,raw.byteLength),clen=dv.getUint32(0,true);if(clen!==raw.length-8)throw new Error("Panjang data terkompresi tidak cocok.");const inner=await streamCodec(raw.slice(8),"decompress"),view=new DataView(inner.buffer,inner.byteOffset,inner.byteLength);let p=0;formatVersion=inner[p++];const count=view.getUint16(p,true);p+=2;const list=[];for(let i=0;i<count;i++){if(p+4>inner.length)throw new Error("Daftar file terpotong.");const len=view.getUint32(p,true);p+=4;if(p+len+3>inner.length)throw new Error("Isi file paket tidak lengkap.");const data=inner.slice(p,p+len);p+=len;const sl=view.getUint16(p,true);p+=2;const path=dec.decode(inner.slice(p,p+sl));p+=sl;const group=inner[p++];list.push({path,group,data,originalName:path.split("/").pop()})}const meta=[];while(inner.length-p>16){const len=view.getUint32(p,true);p+=4;if(len<=0||p+len>inner.length-16)throw new Error("Metadata paket tidak dikenali.");meta.push(JSON.parse(dec.decode(inner.slice(p,p+len))));p+=len}if(inner.length-p!==16)throw new Error("Bagian ID paket tidak lengkap.");const primary=view.getBigUint64(p,true);p+=8;const effect=view.getBigUint64(p,true);entries=list;$("metadata").value=JSON.stringify(meta,null,2);$("primaryId").value=primary.toString();$("effectId").value=effect.toString();sourceName=file.name.replace(/\.dat$/i,"")+"-edited.dat";render();setLog(`Template dibuka: ${list.length} file, ${meta.length} metadata.`,"ok")}
-    async function addFiles(files){for(const file of files){const g=guess(file);entries.push({path:g.path,group:g.group,data:new Uint8Array(await file.arrayBuffer()),originalName:file.name})}render();setLog(`${files.length} aset ditambahkan.`,"ok")}
-    function tidy(){entries=entries.map(e=>{const fake={name:e.originalName||e.path.split("/").pop()},g=guess(fake);return{...e,path:g.path,group:g.group}});render();setLog("Path dan grup dirapikan otomatis.","ok")}
-    async function exportDat(){try{if(!entries.length)throw new Error("Tambahkan minimal satu file.");if(entries.length>65535)throw new Error("Terlalu banyak file.");const metadata=JSON.parse($("metadata").value||"[]");if(!Array.isArray(metadata))throw new Error("Metadata harus berupa array JSON.");const parts=[new Uint8Array([formatVersion]),u16(entries.length)];for(const e of entries){const name=enc.encode(e.path.trim());if(!name.length||name.length>65535)throw new Error("Path file kosong atau terlalu panjang.");parts.push(u32(e.data.length),e.data,u16(name.length),name,new Uint8Array([e.group]))}for(const obj of metadata){const b=enc.encode(JSON.stringify(obj));parts.push(u32(b.length),b)}parts.push(u64(safeBig($("primaryId").value)),u64(safeBig($("effectId").value)));setLog("Mengompresi paket…");const compressed=await streamCodec(join(parts),"compress"),output=join([u32(compressed.length),u32(0),compressed]),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([output],{type:"application/octet-stream"}));a.download=sourceName;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);setLog(`Selesai: ${a.download} • ${fmt(output.length)}`,"ok")}catch(err){setLog(err.message||String(err),"err")}}
-    $("templateInput").onchange=async e=>{try{if(e.target.files[0])await parseDat(e.target.files[0])}catch(err){setLog(err.message||String(err),"err")}e.target.value=""};$("assetInput").onchange=async e=>{try{await addFiles([...e.target.files])}catch(err){setLog(err.message||String(err),"err")}e.target.value=""};$("blankBtn").onclick=()=>{entries=[];formatVersion=1;sourceName="custom-assets.dat";$("metadata").value="[]";$("primaryId").value="0";$("effectId").value="0";render();setLog("Paket baru dibuat.")};$("autoBtn").onclick=tidy;$("exportBtn").onclick=exportDat;render();
+    const enc = new TextEncoder(), dec = new TextDecoder();
+    let entries = [], sourceName = "custom-items-merged.dat", formatVersion = 1, packageCount = 0;
+    const $ = (id) => document.getElementById(id);
+
+    const u16 = n => { const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,n,true); return b };
+    const u32 = n => { const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,n,true); return b };
+    const u64 = n => { const b=new Uint8Array(8); new DataView(b.buffer).setBigUint64(0,BigInt(n||0),true); return b };
+    function join(parts){ const total=parts.reduce((s,p)=>s+p.length,0), out=new Uint8Array(total); let o=0; for(const p of parts){out.set(p,o);o+=p.length} return out }
+    async function streamCodec(data, type){
+      const stream = type==="compress" ? new CompressionStream("deflate") : new DecompressionStream("deflate");
+      return new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(stream)).arrayBuffer());
+    }
+    const safeBig = v => { try{return BigInt(String(v||"0").trim())}catch{return 0n} };
+    function guess(file){
+      const n=file.name.toLowerCase();
+      if(n.endsWith(".xml")) return {path:file.name,group:3};
+      if(n.includes("_ic.")) return {path:file.name,group:1};
+      if(n.includes("particle")||n.includes("punch")||n.includes("slash")) return {path:"game/"+file.name,group:4};
+      return {path:"game/"+file.name,group:2};
+    }
+    function fmt(n){return n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(2)+" MB"}
+    function setLog(text,kind=""){ $("log").textContent=text; $("log").className=kind }
+    function render(){
+      const root=$("files"); root.innerHTML="";
+      if(!entries.length){root.innerHTML='<div class="empty">Buka template atau tambahkan aset untuk mulai.</div>'}
+      entries.forEach((e,i)=>{
+        const row=document.createElement("div"); row.className="file";
+        row.innerHTML=`<div class="file-name"><strong></strong><small>${fmt(e.data.length)}</small></div><input aria-label="Path arsip" type="text"><input aria-label="Grup file" type="number" min="0" max="255"><button class="btn icon danger" aria-label="Hapus file">×</button>`;
+        row.querySelector("strong").textContent=e.originalName||e.path;
+        const inputs=row.querySelectorAll("input"); inputs[0].value=e.path; inputs[1].value=e.group;
+        inputs[0].oninput=ev=>entries[i].path=ev.target.value;
+        inputs[1].oninput=ev=>entries[i].group=Math.max(0,Math.min(255,Number(ev.target.value)||0));
+        row.querySelector("button").onclick=()=>{entries.splice(i,1);render()};
+        root.appendChild(row);
+      });
+      $("summary").textContent=entries.length?`${entries.length} file • ${fmt(entries.reduce((s,e)=>s+e.data.length,0))}`:"Belum ada file";
+    }
+    async function decodeDat(file){
+      const raw=new Uint8Array(await file.arrayBuffer());
+      if(raw.length<9) throw new Error("File DAT terlalu kecil.");
+      const dv=new DataView(raw.buffer,raw.byteOffset,raw.byteLength), clen=dv.getUint32(0,true);
+      if(clen!==raw.length-8) throw new Error("Panjang data terkompresi tidak cocok.");
+      const inner=await streamCodec(raw.slice(8),"decompress"), view=new DataView(inner.buffer,inner.byteOffset,inner.byteLength);
+      let p=0; const version=inner[p++]; const count=view.getUint16(p,true); p+=2; const list=[];
+      for(let i=0;i<count;i++){
+        if(p+4>inner.length) throw new Error("Daftar file terpotong.");
+        const len=view.getUint32(p,true); p+=4;
+        if(p+len+3>inner.length) throw new Error("Isi file paket tidak lengkap.");
+        const data=inner.slice(p,p+len); p+=len;
+        const sl=view.getUint16(p,true); p+=2;
+        const path=dec.decode(inner.slice(p,p+sl)); p+=sl;
+        const group=inner[p++]; list.push({path,group,data,originalName:path.split("/").pop()});
+      }
+      const meta=[];
+      while(inner.length-p>=12){
+        const len=view.getUint32(p,true);
+        if(len<=0||p+4+len>inner.length) break;
+        const first=inner[p+4];
+        if(first!==123&&first!==91) break;
+        try{
+          meta.push(JSON.parse(dec.decode(inner.slice(p+4,p+4+len))));
+          p+=4+len;
+        }catch{break}
+      }
+      if((inner.length-p)%8!==0) throw new Error("Bagian ID paket tidak dikenali.");
+      const ids=[];
+      while(p<inner.length){ids.push(view.getBigUint64(p,true));p+=8}
+      return {version,entries:list,metadata:meta,ids,name:file.name};
+    }
+    function sameBytes(a,b){
+      if(a.length!==b.length) return false;
+      for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false;
+      return true;
+    }
+    async function mergeDats(files){
+      const mergedEntries=[],mergedMeta=[],mergedIds=[];
+      let duplicateCount=0;
+      for(const file of files){
+        const pkg=await decodeDat(file);
+        formatVersion=pkg.version;
+        for(const entry of pkg.entries){
+          const duplicate=mergedEntries.find(e=>e.path===entry.path&&e.group===entry.group&&sameBytes(e.data,entry.data));
+          if(duplicate) duplicateCount++; else mergedEntries.push(entry);
+        }
+        mergedMeta.push(...pkg.metadata);
+        mergedIds.push(...pkg.ids);
+      }
+      entries=mergedEntries; packageCount=files.length;
+      $("metadata").value=JSON.stringify(mergedMeta,null,2);
+      $("itemIds").value=mergedIds.map(String).join(", ");
+      sourceName=files.length===1?files[0].name.replace(/\.dat$/i,"")+"-edited.dat":`merged-${files.length}-items.dat`;
+      render();
+      setLog(`${files.length} DAT digabung: ${mergedMeta.length} metadata, ${mergedIds.length} ID${duplicateCount?`, ${duplicateCount} resource duplikat dilewati`:""}.`,"ok");
+    }
+    async function addFiles(files){
+      for(const file of files){
+        const g=guess(file);
+        entries.push({path:g.path,group:g.group,data:new Uint8Array(await file.arrayBuffer()),originalName:file.name});
+      }
+      render(); setLog(`${files.length} aset ditambahkan.`,"ok");
+    }
+    function tidy(){
+      entries=entries.map(e=>{const fake={name:e.originalName||e.path.split("/").pop()},g=guess(fake);return{...e,path:g.path,group:g.group}});
+      render(); setLog("Path dan grup dirapikan otomatis.","ok");
+    }
+    async function exportDat(){
+      try{
+        if(!entries.length) throw new Error("Tambahkan minimal satu file.");
+        if(entries.length>65535) throw new Error("Terlalu banyak file.");
+        let metadata=JSON.parse($("metadata").value||"[]");
+        if(!Array.isArray(metadata)) throw new Error("Metadata harus berupa array JSON.");
+        const parts=[new Uint8Array([formatVersion]),u16(entries.length)];
+        for(const e of entries){
+          const name=enc.encode(e.path.trim());
+          if(!name.length||name.length>65535) throw new Error("Path file kosong atau terlalu panjang.");
+          parts.push(u32(e.data.length),e.data,u16(name.length),name,new Uint8Array([e.group]));
+        }
+        for(const obj of metadata){const b=enc.encode(JSON.stringify(obj));parts.push(u32(b.length),b)}
+        const ids=$("itemIds").value.split(",").map(v=>v.trim()).filter(Boolean).map(safeBig);
+        for(const id of ids) parts.push(u64(id));
+        setLog("Mengompresi paket…");
+        const compressed=await streamCodec(join(parts),"compress");
+        const output=join([u32(compressed.length),u32(0),compressed]);
+        const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([output],{type:"application/octet-stream"})); a.download=sourceName; a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+        setLog(`Selesai: ${a.download} • ${fmt(output.length)}`,"ok");
+      }catch(err){setLog(err.message||String(err),"err")}
+    }
+    $("templateInput").onchange=async e=>{try{if(e.target.files.length)await mergeDats([...e.target.files])}catch(err){setLog(err.message||String(err),"err")}e.target.value=""};
+    $("assetInput").onchange=async e=>{try{await addFiles([...e.target.files])}catch(err){setLog(err.message||String(err),"err")}e.target.value=""};
+    $("blankBtn").onclick=()=>{entries=[];formatVersion=1;packageCount=0;sourceName="custom-assets.dat";$("metadata").value="[]";$("itemIds").value="";render();setLog("Paket resource baru dibuat.")};
+    $("autoBtn").onclick=tidy; $("exportBtn").onclick=exportDat; render();
   </script>
 </body>
 </html>
