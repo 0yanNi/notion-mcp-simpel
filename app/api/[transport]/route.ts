@@ -1,6 +1,7 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 
+// MCP handler v2 using Streamable HTTP.
 const handler = createMcpHandler((server) => {
   server.registerTool(
     "buat_salam",
